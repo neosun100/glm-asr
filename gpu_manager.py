@@ -100,8 +100,14 @@ class GPUManager:
             status["gpu_memory_total_mb"] = torch.cuda.get_device_properties(0).total_memory / 1024 / 1024
         return status
 
-    def transcribe(self, audio_path: str, max_new_tokens: int = 512) -> str:
-        """转录音频 - 支持长音频分段处理"""
+    def transcribe(self, audio_path: str, max_new_tokens: int = 512, max_duration: int = 1800) -> str:
+        """转录音频 - 支持长音频分段处理
+        
+        Args:
+            audio_path: 音频文件路径
+            max_new_tokens: 每段最大生成 token 数
+            max_duration: 最大音频时长（秒），默认 30 分钟，超过则截断
+        """
         if self.model is None:
             raise RuntimeError("模型未加载，请先加载模型")
         
@@ -111,9 +117,16 @@ class GPUManager:
         with self.lock:
             # 加载音频获取时长
             wav, sr = torchaudio.load(str(audio_path))
+            wav = wav[:1, :]  # 只取单声道
             if sr != 16000:
                 wav = torchaudio.transforms.Resample(sr, 16000)(wav)
             duration = wav.shape[1] / 16000
+            
+            # 超长音频截断保护
+            if duration > max_duration:
+                logger.warning(f"音频时长 {duration:.0f}s 超过限制 {max_duration}s，将截断处理")
+                wav = wav[:, :max_duration * 16000]
+                duration = max_duration
             
             # 短音频直接处理
             if duration <= 30:

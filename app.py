@@ -149,7 +149,7 @@ def transcribe():
     if file.filename == '' or not allowed_file(file.filename):
         return jsonify({"error": "无效的文件格式"}), 400
     
-    max_new_tokens = int(request.form.get('max_new_tokens', 128))
+    max_new_tokens = int(request.form.get('max_new_tokens', 512))
     
     # 保存临时文件
     filename = secure_filename(file.filename)
@@ -161,6 +161,9 @@ def transcribe():
         return jsonify({"text": result, "status": "success"})
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        logger.error(f"转录失败: {e}")
+        return jsonify({"error": f"转录失败: {str(e)}"}), 500
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
