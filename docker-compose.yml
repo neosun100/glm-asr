@@ -1,0 +1,27 @@
+services:
+  glm-asr:
+    build: .
+    container_name: glm-asr
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${PORT:-7860}:7860"
+    environment:
+      - PORT=7860
+      - MODEL_CHECKPOINT=${MODEL_CHECKPOINT:-zai-org/GLM-ASR-Nano-2512}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - HF_HOME=/app/cache
+    volumes:
+      - ./cache:/app/cache
+      - ./examples:/app/examples:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${NVIDIA_VISIBLE_DEVICES:-0}"]
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

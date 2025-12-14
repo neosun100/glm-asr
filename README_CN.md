@@ -1,0 +1,228 @@
+[English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JP.md)
+
+<div align="center">
+<img src="resources/logo.svg" width="20%"/>
+
+# GLM-ASR
+
+[![Docker](https://img.shields.io/badge/Docker-neosun%2Fglm--asr-blue?logo=docker)](https://hub.docker.com/r/neosun/glm-asr)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
+
+**基于 GLM-ASR-Nano 的一站式语音识别服务**
+
+Web 界面 • REST API • MCP 服务 • 长音频支持
+
+</div>
+
+---
+
+## ✨ 功能特性
+
+- 🎯 **高精度识别** - 基于 GLM-ASR-Nano-2512 (1.5B)，性能超越 Whisper V3
+- 🌍 **17 种语言** - 支持中文、英语、粤语、日语、韩语等
+- 🎤 **长音频支持** - 分段处理，无音频长度限制
+- 🖥️ **Web 界面** - 现代暗色主题，支持 4 种语言切换
+- 🔌 **REST API** - 完整 API 接口，Swagger 文档
+- 🤖 **MCP 服务** - 支持 Claude Desktop 集成
+- 💾 **显存管理** - 手动加载/卸载模型，灵活控制显存
+- 🐳 **Docker 部署** - 一键启动
+
+---
+
+## 🚀 快速开始
+
+### Docker 方式（推荐）
+
+```bash
+docker run -d --gpus all -p 7860:7860 neosun/glm-asr:latest
+```
+
+访问：http://localhost:7860
+
+### Docker Compose
+
+```bash
+git clone https://github.com/neosun100/glm-asr.git
+cd glm-asr
+docker compose up -d
+```
+
+---
+
+## 📦 安装部署
+
+### 环境要求
+
+- NVIDIA GPU（显存 6GB+）
+- Docker + NVIDIA Container Toolkit
+- 或：Python 3.10+、CUDA 12.x、FFmpeg
+
+### 方式一：Docker 部署
+
+```bash
+# 拉取镜像
+docker pull neosun/glm-asr:latest
+
+# 启动容器
+docker run -d \
+  --name glm-asr \
+  --gpus all \
+  -p 7860:7860 \
+  -v ./cache:/app/cache \
+  neosun/glm-asr:latest
+
+# 健康检查
+curl http://localhost:7860/health
+```
+
+### 方式二：本地安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/neosun100/glm-asr.git
+cd glm-asr
+
+# 安装依赖
+pip install -r requirements.txt
+sudo apt install ffmpeg
+
+# 启动服务
+python app.py
+```
+
+---
+
+## ⚙️ 配置说明
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MODEL_PATH` | `zai-org/GLM-ASR-Nano-2512` | HuggingFace 模型路径 |
+| `PORT` | `7860` | 服务端口 |
+| `HF_HOME` | `/app/cache` | 模型缓存目录 |
+
+### docker-compose.yml
+
+```yaml
+services:
+  glm-asr:
+    image: neosun/glm-asr:latest
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./cache:/app/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+---
+
+## 📖 使用说明
+
+### Web 界面
+
+打开 http://localhost:7860：
+- 上传音频文件（wav/mp3/flac/m4a/ogg）
+- 点击"转录"
+- 复制结果
+
+### REST API
+
+```bash
+# 转录音频
+curl -X POST http://localhost:7860/api/transcribe \
+  -F "file=@audio.mp3"
+
+# 查看 GPU 状态
+curl http://localhost:7860/gpu/status
+
+# 卸载模型
+curl -X POST http://localhost:7860/gpu/unload
+
+# 重新加载模型
+curl -X POST http://localhost:7860/gpu/load
+```
+
+### API 文档
+
+Swagger UI：http://localhost:7860/docs
+
+### MCP 服务（Claude Desktop）
+
+在 `claude_desktop_config.json` 中添加：
+
+```json
+{
+  "mcpServers": {
+    "glm-asr": {
+      "command": "python",
+      "args": ["/path/to/glm-asr/mcp_server.py"]
+    }
+  }
+}
+```
+
+---
+
+## 🏗️ 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 模型 | GLM-ASR-Nano-2512 (1.5B) |
+| 后端 | Flask + Flask-SocketIO |
+| 前端 | HTML5 + Vanilla JS |
+| 容器 | Docker + NVIDIA CUDA |
+| API 文档 | Flasgger (Swagger) |
+| MCP | FastMCP |
+
+---
+
+## 📊 性能对比
+
+GLM-ASR-Nano 在同类模型中错误率最低（4.10）：
+
+![Benchmark](resources/bench.png)
+
+---
+
+## 🤝 参与贡献
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送分支 (`git push origin feature/amazing`)
+5. 提交 Pull Request
+
+---
+
+## 📝 更新日志
+
+### v1.0.0 (2024-12-14)
+- ✅ 长音频分段转录
+- ✅ 4 语言 Web 界面
+- ✅ REST API + Swagger 文档
+- ✅ MCP 服务集成
+- ✅ Docker 一体化镜像
+
+---
+
+## 📄 开源协议
+
+[Apache License 2.0](LICENSE)
+
+---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=neosun100/glm-asr&type=Date)](https://star-history.com/#neosun100/glm-asr)
+
+## 📱 关注公众号
+
+<img src="https://img.aws.xin/uPic/扫码_搜索联合传播样式-标准色版.png" width="300"/>
