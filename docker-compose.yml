@@ -1,6 +1,6 @@
 services:
   glm-asr:
-    build: .
+    image: neosun/glm-asr:v2.0.0-fastapi-sse
     container_name: glm-asr
     restart: unless-stopped
     ports:

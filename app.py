@@ -169,9 +169,61 @@ def transcribe():
             os.remove(filepath)
 
 
+# 全局进度状态
+transcribe_progress = {"current": 0, "total": 0, "text": ""}
+
+@app.route('/api/transcribe/progress', methods=['GET'])
+def get_progress():
+    """获取转录进度"""
+    return jsonify(transcribe_progress)
+
+
+@app.route('/api/transcribe/long', methods=['POST'])
+def transcribe_long():
+    """长音频转录（带进度）"""
+    global transcribe_progress
+    
+    if 'file' not in request.files:
+        return jsonify({"error": "未上传文件"}), 400
+    
+    file = request.files['file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({"error": "无效的文件格式"}), 400
+    
+    max_new_tokens = int(request.form.get('max_new_tokens', 512))
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+    
+    transcribe_progress["current"] = 0
+    transcribe_progress["total"] = 0
+    transcribe_progress["text"] = ""
+    
+    def on_progress(current, total, duration, text):
+        transcribe_progress["current"] = current
+        transcribe_progress["total"] = total
+        if text:
+            transcribe_progress["text"] += text
+    
+    try:
+        result = gpu_manager.transcribe(filepath, max_new_tokens, on_progress)
+        transcribe_progress["current"] = 0
+        transcribe_progress["total"] = 0
+        transcribe_progress["text"] = ""
+        return jsonify({"text": result, "status": "success"})
+    except Exception as e:
+        transcribe_progress["current"] = 0
+        transcribe_progress["total"] = 0
+        transcribe_progress["text"] = ""
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+
 @app.route('/api/transcribe/stream', methods=['POST'])
 def transcribe_stream():
-    """流式转录音频（SSE）
+    """流式转录音频（SSE）- 带进度
     ---
     tags: [ASR]
     consumes:
@@ -198,13 +250,48 @@ def transcribe_stream():
     file.save(filepath)
     
     def generate():
+        progress_data = []
+        
+        def on_progress(current, total, seg_dur, text):
+            progress_data.append((current, total, seg_dur, text))
+        
         try:
             yield f"data: {json.dumps({'type': 'start'})}\n\n"
-            result = gpu_manager.transcribe(filepath, max_new_tokens)
-            yield f"data: {json.dumps({'type': 'result', 'text': result})}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            
+            # 使用线程执行转录，主线程发送进度
+            import threading
+            result_holder = [None]
+            error_holder = [None]
+            
+            def do_transcribe():
+                try:
+                    result_holder[0] = gpu_manager.transcribe(filepath, max_new_tokens, on_progress)
+                except Exception as e:
+                    error_holder[0] = str(e)
+            
+            thread = threading.Thread(target=do_transcribe)
+            thread.start()
+            
+            sent_count = 0
+            while thread.is_alive() or sent_count < len(progress_data):
+                while sent_count < len(progress_data):
+                    cur, tot, dur, txt = progress_data[sent_count]
+                    yield f"data: {json.dumps({'type': 'progress', 'current': cur, 'total': tot, 'duration': round(dur, 1)})}\n\n"
+                    if txt:
+                        yield f"data: {json.dumps({'type': 'partial', 'text': txt})}\n\n"
+                    sent_count += 1
+                if thread.is_alive():
+                    import time
+                    time.sleep(0.1)
+            
+            thread.join()
+            
+            if error_holder[0]:
+                yield f"data: {json.dumps({'type': 'error', 'message': error_holder[0]})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'done', 'text': result_holder[0] or ''})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
             if os.path.exists(filepath):
                 os.remove(filepath)

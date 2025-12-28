@@ -3,25 +3,10 @@ import threading
 import logging
 import torch
 from pathlib import Path
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, WhisperFeatureExtractor
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoProcessor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-WHISPER_FEAT_CFG = {
-    "chunk_length": 30,
-    "feature_extractor_type": "WhisperFeatureExtractor",
-    "feature_size": 128,
-    "hop_length": 160,
-    "n_fft": 400,
-    "n_samples": 480000,
-    "nb_max_frames": 3000,
-    "padding_side": "right",
-    "padding_value": 0.0,
-    "processor_class": "WhisperProcessor",
-    "return_attention_mask": False,
-    "sampling_rate": 16000,
-}
 
 
 class GPUManager:
@@ -40,8 +25,7 @@ class GPUManager:
             return
         self._initialized = True
         self.model = None
-        self.tokenizer = None
-        self.feature_extractor = None
+        self.processor = None
         self.config = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.checkpoint_dir = None
@@ -57,15 +41,13 @@ class GPUManager:
             logger.info(f"正在加载模型: {checkpoint_dir}")
             self.checkpoint_dir = checkpoint_dir
             
-            self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
-            self.feature_extractor = WhisperFeatureExtractor(**WHISPER_FEAT_CFG)
+            self.processor = AutoProcessor.from_pretrained(checkpoint_dir)
             self.config = AutoConfig.from_pretrained(checkpoint_dir, trust_remote_code=True)
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(
                 checkpoint_dir,
-                config=self.config,
-                torch_dtype=torch.bfloat16,
-                trust_remote_code=True,
-            ).to(self.device)
+                dtype="auto",
+                device_map="auto",
+            )
             self.model.eval()
             
             logger.info(f"模型加载完成，设备: {self.device}")
@@ -100,12 +82,13 @@ class GPUManager:
             status["gpu_memory_total_mb"] = torch.cuda.get_device_properties(0).total_memory / 1024 / 1024
         return status
 
-    def transcribe(self, audio_path: str, max_new_tokens: int = 512) -> str:
+    def transcribe(self, audio_path: str, max_new_tokens: int = 512, progress_callback=None) -> str:
         """转录音频 - VAD 智能分段，支持任意长度音频
         
         Args:
             audio_path: 音频文件路径
             max_new_tokens: 每段最大生成 token 数
+            progress_callback: 进度回调函数 (current, total, segment_duration, text)
         """
         if self.model is None:
             raise RuntimeError("模型未加载，请先加载模型")
@@ -113,74 +96,57 @@ class GPUManager:
         import torchaudio
         import tempfile
         import os
-        from inference import build_prompt, prepare_inputs
         from vad_segmenter import smart_segment
         
         with self.lock:
-            # 加载音频
             wav, sr = torchaudio.load(str(audio_path))
-            wav = wav[:1, :]  # 单声道
+            wav = wav[:1, :]
             if sr != 16000:
                 wav = torchaudio.transforms.Resample(sr, 16000)(wav)
             
             duration = wav.shape[1] / 16000
             logger.info(f"音频时长: {duration:.1f}s")
             
-            # 短音频直接处理
             if duration <= 25:
-                batch = build_prompt(
-                    Path(audio_path),
-                    self.tokenizer,
-                    self.feature_extractor,
-                    merge_factor=self.config.merge_factor,
-                )
-                model_inputs, prompt_len = prepare_inputs(batch, self.device)
-                
+                if progress_callback:
+                    progress_callback(1, 1, duration, None)
+                inputs = self.processor.apply_transcription_request(str(audio_path))
+                inputs = inputs.to(self.model.device, dtype=self.model.dtype)
                 with torch.inference_mode():
-                    generated = self.model.generate(
-                        **model_inputs,
-                        max_new_tokens=max_new_tokens,
-                        do_sample=False,
-                    )
-                
-                transcript_ids = generated[0, prompt_len:].cpu().tolist()
-                return self.tokenizer.decode(transcript_ids, skip_special_tokens=True).strip()
+                    outputs = self.model.generate(**inputs, do_sample=False, max_new_tokens=max_new_tokens)
+                decoded = self.processor.batch_decode(outputs[:, inputs.input_ids.shape[1]:], skip_special_tokens=True)
+                text = decoded[0].strip() if decoded else ""
+                if progress_callback:
+                    progress_callback(1, 1, duration, text)
+                return text
             
-            # 长音频：VAD 智能分段
             segments = smart_segment(wav[0], sr=16000, max_duration=25.0, min_duration=2.0)
-            
             if not segments:
                 return ""
             
+            total = len(segments)
             results = []
             for i, (start, end) in enumerate(segments):
-                chunk = wav[:, start:end]
+                seg_dur = (end - start) / 16000
+                if progress_callback:
+                    progress_callback(i + 1, total, seg_dur, None)
                 
-                # 保存临时文件
+                chunk = wav[:, start:end]
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                     tmp_path = f.name
                     torchaudio.save(tmp_path, chunk, 16000)
                 
                 try:
-                    batch = build_prompt(
-                        Path(tmp_path),
-                        self.tokenizer,
-                        self.feature_extractor,
-                        merge_factor=self.config.merge_factor,
-                    )
-                    model_inputs, prompt_len = prepare_inputs(batch, self.device)
-                    
+                    inputs = self.processor.apply_transcription_request(tmp_path)
+                    inputs = inputs.to(self.model.device, dtype=self.model.dtype)
                     with torch.inference_mode():
-                        generated = self.model.generate(
-                            **model_inputs,
-                            max_new_tokens=max_new_tokens,
-                            do_sample=False,
-                        )
-                    
-                    transcript_ids = generated[0, prompt_len:].cpu().tolist()
-                    text = self.tokenizer.decode(transcript_ids, skip_special_tokens=True).strip()
+                        outputs = self.model.generate(**inputs, do_sample=False, max_new_tokens=max_new_tokens)
+                    decoded = self.processor.batch_decode(outputs[:, inputs.input_ids.shape[1]:], skip_special_tokens=True)
+                    text = decoded[0].strip() if decoded else ""
                     if text:
                         results.append(text)
+                        if progress_callback:
+                            progress_callback(i + 1, total, seg_dur, text)
                 finally:
                     os.unlink(tmp_path)
             

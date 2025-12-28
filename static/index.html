@@ -4,60 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GLM-ASR</title>
-    <style>
-        :root {
-            --bg: #0f0f0f; --card: #1a1a1a; --border: #333; --text: #e0e0e0;
-            --primary: #4f8cff; --success: #4caf50; --error: #f44336;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
-        h1 svg { width: 32px; height: 32px; }
-        select { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-        .card-title { font-size: 14px; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
-        .gpu-status { display: flex; gap: 20px; flex-wrap: wrap; }
-        .gpu-item { flex: 1; min-width: 120px; }
-        .gpu-item label { font-size: 12px; color: #666; }
-        .gpu-item .value { font-size: 18px; font-weight: 600; }
-        .gpu-item .value.loaded { color: var(--success); }
-        .gpu-item .value.unloaded { color: var(--error); }
-        .btn-group { display: flex; gap: 8px; margin-top: 12px; }
-        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: opacity 0.2s; }
-        button:hover { opacity: 0.85; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.secondary { background: #444; }
-        button.danger { background: var(--error); }
-        .upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: border-color 0.2s; }
-        .upload-area:hover, .upload-area.dragover { border-color: var(--primary); }
-        .upload-area input { display: none; }
-        .upload-area p { color: #888; margin-top: 8px; font-size: 14px; }
-        .file-info { margin-top: 12px; padding: 12px; background: #222; border-radius: 8px; display: none; }
-        .file-info.show { display: block; }
-        .params { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-        .param-item label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
-        .param-item input { width: 100%; background: #222; border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; }
-        .result-area { min-height: 120px; background: #222; border-radius: 8px; padding: 16px; white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.6; }
-        .result-area.empty { color: #666; font-style: italic; }
-        .progress { height: 4px; background: #333; border-radius: 2px; margin-top: 12px; overflow: hidden; display: none; }
-        .progress.show { display: block; }
-        .progress-bar { height: 100%; background: var(--primary); width: 0; transition: width 0.3s; }
-        .progress-bar.indeterminate { width: 30%; animation: indeterminate 1s infinite linear; }
-        @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
-        .status-msg { margin-top: 8px; font-size: 14px; color: #888; }
-        .copy-btn { float: right; padding: 4px 12px; font-size: 12px; }
-        @media (max-width: 600px) { .gpu-status { flex-direction: column; } }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>
-                <svg viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="45" stroke="#4f8cff" stroke-width="6"/><path d="M30 50 L45 65 L70 35" stroke="#4f8cff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
+                    </svg>
+                </div>
                 GLM-ASR
-            </h1>
+            </div>
             <select id="lang" onchange="setLang(this.value)">
                 <option value="en">English</option>
                 <option value="zh-CN">简体中文</option>
@@ -65,170 +25,128 @@
                 <option value="ja">日本語</option>
             </select>
         </header>
-
         <div class="card">
             <div class="card-title" data-i18n="gpu_status">GPU Status</div>
-            <div class="gpu-status">
+            <div class="gpu-grid">
                 <div class="gpu-item"><label data-i18n="model">Model</label><div class="value" id="modelStatus">-</div></div>
                 <div class="gpu-item"><label data-i18n="memory">Memory</label><div class="value" id="memoryUsed">-</div></div>
                 <div class="gpu-item"><label data-i18n="device">Device</label><div class="value" id="deviceInfo">-</div></div>
             </div>
-            <div class="btn-group">
+            <div class="btn-row">
                 <button class="secondary" onclick="loadModel()" id="loadBtn" data-i18n="load">Load Model</button>
                 <button class="danger" onclick="unloadModel()" id="unloadBtn" data-i18n="unload">Unload</button>
             </div>
         </div>
-
         <div class="card">
             <div class="card-title" data-i18n="upload_audio">Upload Audio</div>
-            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
                 <p data-i18n="drop_hint">Click or drag audio file here</p>
                 <input type="file" id="fileInput" accept=".wav,.mp3,.flac,.m4a,.ogg,.webm" onchange="handleFile(this.files[0])">
             </div>
-            <div class="file-info" id="fileInfo"></div>
+            <div class="file-badge" id="fileBadge"></div>
         </div>
-
         <div class="card">
             <div class="card-title" data-i18n="parameters">Parameters</div>
-            <div class="params">
-                <div class="param-item">
-                    <label data-i18n="max_tokens">Max New Tokens</label>
-                    <input type="number" id="maxTokens" value="128" min="1" max="1024">
-                </div>
+            <div class="param-row">
+                <label data-i18n="max_tokens">Max New Tokens</label>
+                <input type="number" id="maxTokens" value="512" min="1" max="2048">
             </div>
         </div>
-
         <div class="card">
-            <button onclick="transcribe()" id="transcribeBtn" style="width:100%" data-i18n="transcribe">Transcribe</button>
-            <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
-            <div class="status-msg" id="statusMsg"></div>
+            <button class="transcribe-btn" onclick="transcribe()" id="transcribeBtn" data-i18n="transcribe">Transcribe</button>
+            <div class="progress-wrap" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+            <div class="status-text" id="statusMsg"></div>
         </div>
-
         <div class="card">
-            <div class="card-title">
-                <span data-i18n="result">Result</span>
+            <div class="result-header">
+                <div class="card-title" data-i18n="result">Result</div>
                 <button class="copy-btn secondary" onclick="copyResult()" data-i18n="copy">Copy</button>
             </div>
-            <div class="result-area empty" id="result" data-i18n="result_placeholder">Transcription result will appear here...</div>
+            <div class="result-box empty" id="result" data-i18n="result_placeholder">Transcription result will appear here...</div>
         </div>
     </div>
+<script>
+const i18n={en:{gpu_status:"GPU Status",model:"Model",memory:"Memory",device:"Device",load:"Load Model",unload:"Unload",upload_audio:"Upload Audio",drop_hint:"Click or drag audio file here",parameters:"Parameters",max_tokens:"Max New Tokens",transcribe:"Transcribe",result:"Result",copy:"Copy",result_placeholder:"Transcription result will appear here...",loaded:"Loaded",unloaded:"Unloaded",processing:"Processing",copied:"Copied!",error:"Error",file_selected:"Selected: ",segment:"Segment",complete:"Complete"},"zh-CN":{gpu_status:"GPU 状态",model:"模型",memory:"显存",device:"设备",load:"加载模型",unload:"卸载",upload_audio:"上传音频",drop_hint:"点击或拖拽音频文件到此处",parameters:"参数设置",max_tokens:"最大生成 Token",transcribe:"开始转录",result:"转录结果",copy:"复制",result_placeholder:"转录结果将显示在这里...",loaded:"已加载",unloaded:"未加载",processing:"处理中",copied:"已复制!",error:"错误",file_selected:"已选择: ",segment:"分段",complete:"完成"},"zh-TW":{gpu_status:"GPU 狀態",model:"模型",memory:"顯存",device:"設備",load:"載入模型",unload:"卸載",upload_audio:"上傳音頻",drop_hint:"點擊或拖拽音頻文件到此處",parameters:"參數設置",max_tokens:"最大生成 Token",transcribe:"開始轉錄",result:"轉錄結果",copy:"複製",result_placeholder:"轉錄結果將顯示在這裡...",loaded:"已載入",unloaded:"未載入",processing:"處理中",copied:"已複製!",error:"錯誤",file_selected:"已選擇: ",segment:"分段",complete:"完成"},ja:{gpu_status:"GPU ステータス",model:"モデル",memory:"メモリ",device:"デバイス",load:"モデル読込",unload:"アンロード",upload_audio:"音声アップロード",drop_hint:"クリックまたはドラッグしてファイルを選択",parameters:"パラメータ",max_tokens:"最大トークン数",transcribe:"文字起こし",result:"結果",copy:"コピー",result_placeholder:"文字起こし結果がここに表示されます...",loaded:"読込済",unloaded:"未読込",processing:"処理中",copied:"コピーしました!",error:"エラー",file_selected:"選択済: ",segment:"セグメント",complete:"完了"}};
+let currentLang=localStorage.getItem('lang')||'en',selectedFile=null;
+function setLang(l){currentLang=l;localStorage.setItem('lang',l);document.getElementById('lang').value=l;document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.getAttribute('data-i18n');if(i18n[l][k]){if(e.tagName==='INPUT')e.placeholder=i18n[l][k];else e.textContent=i18n[l][k];}});}
+function t(k){return i18n[currentLang][k]||k;}
+async function fetchStatus(){try{const r=await fetch('/gpu/status'),d=await r.json(),s=document.getElementById('modelStatus');s.textContent=d.model_loaded?t('loaded'):t('unloaded');s.className='value '+(d.model_loaded?'loaded':'unloaded');document.getElementById('memoryUsed').textContent=d.gpu_memory_used_mb?Math.round(d.gpu_memory_used_mb)+' MB':'-';document.getElementById('deviceInfo').textContent=d.device||'-';document.getElementById('loadBtn').disabled=d.model_loaded;document.getElementById('unloadBtn').disabled=!d.model_loaded;}catch(e){console.error(e);}}
+async function loadModel(){document.getElementById('loadBtn').disabled=true;document.getElementById('statusMsg').textContent=t('processing');await fetch('/gpu/load',{method:'POST'});await fetchStatus();document.getElementById('statusMsg').textContent='';}
+async function unloadModel(){document.getElementById('unloadBtn').disabled=true;await fetch('/gpu/unload',{method:'POST'});await fetchStatus();}
+function handleFile(f){if(!f)return;selectedFile=f;const b=document.getElementById('fileBadge');b.textContent=t('file_selected')+f.name+' ('+(f.size/1024/1024).toFixed(2)+' MB)';b.classList.add('show');}
 
-    <script>
-const i18n = {
-    en: { gpu_status: "GPU Status", model: "Model", memory: "Memory", device: "Device", load: "Load Model", unload: "Unload", upload_audio: "Upload Audio", drop_hint: "Click or drag audio file here", parameters: "Parameters", max_tokens: "Max New Tokens", transcribe: "Transcribe", result: "Result", copy: "Copy", result_placeholder: "Transcription result will appear here...", loaded: "Loaded", unloaded: "Unloaded", processing: "Processing...", copied: "Copied!", error: "Error", file_selected: "File: " },
-    "zh-CN": { gpu_status: "GPU 状态", model: "模型", memory: "显存", device: "设备", load: "加载模型", unload: "卸载", upload_audio: "上传音频", drop_hint: "点击或拖拽音频文件到此处", parameters: "参数设置", max_tokens: "最大生成 Token", transcribe: "开始转录", result: "转录结果", copy: "复制", result_placeholder: "转录结果将显示在这里...", loaded: "已加载", unloaded: "未加载", processing: "处理中...", copied: "已复制!", error: "错误", file_selected: "文件: " },
-    "zh-TW": { gpu_status: "GPU 狀態", model: "模型", memory: "顯存", device: "設備", load: "載入模型", unload: "卸載", upload_audio: "上傳音頻", drop_hint: "點擊或拖拽音頻文件到此處", parameters: "參數設置", max_tokens: "最大生成 Token", transcribe: "開始轉錄", result: "轉錄結果", copy: "複製", result_placeholder: "轉錄結果將顯示在這裡...", loaded: "已載入", unloaded: "未載入", processing: "處理中...", copied: "已複製!", error: "錯誤", file_selected: "文件: " },
-    ja: { gpu_status: "GPU ステータス", model: "モデル", memory: "メモリ", device: "デバイス", load: "モデル読込", unload: "アンロード", upload_audio: "音声アップロード", drop_hint: "クリックまたはドラッグしてファイルを選択", parameters: "パラメータ", max_tokens: "最大トークン数", transcribe: "文字起こし", result: "結果", copy: "コピー", result_placeholder: "文字起こし結果がここに表示されます...", loaded: "読込済", unloaded: "未読込", processing: "処理中...", copied: "コピーしました!", error: "エラー", file_selected: "ファイル: " }
-};
-let currentLang = localStorage.getItem('lang') || 'en';
-let selectedFile = null;
-
-function setLang(lang) {
-    currentLang = lang;
-    localStorage.setItem('lang', lang);
-    document.getElementById('lang').value = lang;
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (i18n[lang][key]) {
-            if (el.tagName === 'INPUT') el.placeholder = i18n[lang][key];
-            else el.textContent = i18n[lang][key];
+async function transcribe(){
+    if(!selectedFile){alert('Please select a file');return;}
+    const btn=document.getElementById('transcribeBtn'),prog=document.getElementById('progress'),bar=document.getElementById('progressBar'),msg=document.getElementById('statusMsg'),res=document.getElementById('result');
+    btn.disabled=true;prog.classList.add('show');bar.style.width='5%';msg.textContent=t('processing')+'...';res.textContent='';res.classList.add('empty');
+    
+    const fd=new FormData();fd.append('file',selectedFile);fd.append('max_new_tokens',document.getElementById('maxTokens').value);
+    let fullText='';
+    let buffer='';
+    
+    try{
+        const response=await fetch('/api/transcribe/stream',{method:'POST',body:fd});
+        const reader=response.body.getReader();
+        const decoder=new TextDecoder();
+        
+        while(true){
+            const{done,value}=await reader.read();
+            if(done)break;
+            buffer+=decoder.decode(value,{stream:true});
+            
+            const lines=buffer.split('\n');
+            buffer=lines.pop()||'';
+            
+            for(const line of lines){
+                if(!line.startsWith('data: '))continue;
+                const jsonStr=line.slice(6).trim();
+                if(!jsonStr||jsonStr==='')continue;
+                try{
+                    const d=JSON.parse(jsonStr);
+                    if(d.type==='progress'){
+                        const pct=Math.round((d.current/d.total)*100);
+                        bar.style.width=pct+'%';
+                        msg.textContent=t('segment')+' '+d.current+'/'+d.total+' ('+d.duration+'s)';
+                    }else if(d.type==='partial'){
+                        fullText+=d.text;
+                        res.textContent=fullText;
+                        res.classList.remove('empty');
+                    }else if(d.type==='done'){
+                        bar.style.width='100%';
+                        msg.textContent=t('complete');
+                        if(d.text&&d.text.length>fullText.length){
+                            res.textContent=d.text;
+                        }
+                        res.classList.remove('empty');
+                    }else if(d.type==='error'){
+                        throw new Error(d.message);
+                    }
+                }catch(e){
+                    if(e instanceof SyntaxError)continue;
+                    throw e;
+                }
+            }
         }
-    });
-}
-
-function t(key) { return i18n[currentLang][key] || key; }
-
-async function fetchStatus() {
-    try {
-        const res = await fetch('/gpu/status');
-        const data = await res.json();
-        const status = document.getElementById('modelStatus');
-        status.textContent = data.model_loaded ? t('loaded') : t('unloaded');
-        status.className = 'value ' + (data.model_loaded ? 'loaded' : 'unloaded');
-        document.getElementById('memoryUsed').textContent = data.gpu_memory_used_mb ? `${Math.round(data.gpu_memory_used_mb)} MB` : '-';
-        document.getElementById('deviceInfo').textContent = data.device || '-';
-        document.getElementById('loadBtn').disabled = data.model_loaded;
-        document.getElementById('unloadBtn').disabled = !data.model_loaded;
-    } catch (e) { console.error(e); }
-}
-
-async function loadModel() {
-    document.getElementById('loadBtn').disabled = true;
-    document.getElementById('statusMsg').textContent = t('processing');
-    await fetch('/gpu/load', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-    await fetchStatus();
-    document.getElementById('statusMsg').textContent = '';
-}
-
-async function unloadModel() {
-    document.getElementById('unloadBtn').disabled = true;
-    await fetch('/gpu/unload', { method: 'POST' });
-    await fetchStatus();
-}
-
-function handleFile(file) {
-    if (!file) return;
-    selectedFile = file;
-    const info = document.getElementById('fileInfo');
-    info.textContent = t('file_selected') + file.name + ` (${(file.size/1024/1024).toFixed(2)} MB)`;
-    info.classList.add('show');
-}
-
-const uploadArea = document.getElementById('uploadArea');
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
-
-async function transcribe() {
-    if (!selectedFile) { alert('Please select a file'); return; }
-    const btn = document.getElementById('transcribeBtn');
-    const progress = document.getElementById('progress');
-    const progressBar = document.getElementById('progressBar');
-    const statusMsg = document.getElementById('statusMsg');
-    const result = document.getElementById('result');
-    
-    btn.disabled = true;
-    progress.classList.add('show');
-    progressBar.classList.add('indeterminate');
-    statusMsg.textContent = t('processing');
-    result.textContent = '';
-    result.classList.add('empty');
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('max_new_tokens', document.getElementById('maxTokens').value);
-    
-    try {
-        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        result.textContent = data.text || '';
-        result.classList.remove('empty');
-        statusMsg.textContent = '';
-    } catch (e) {
-        result.textContent = t('error') + ': ' + e.message;
-        statusMsg.textContent = '';
-    } finally {
-        btn.disabled = false;
-        progress.classList.remove('show');
-        progressBar.classList.remove('indeterminate');
+    }catch(e){
+        res.textContent=t('error')+': '+e.message;
+    }finally{
+        btn.disabled=false;msg.textContent='';
+        setTimeout(()=>prog.classList.remove('show'),500);
     }
 }
 
-function copyResult() {
-    const text = document.getElementById('result').textContent;
-    navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target;
-        const orig = btn.textContent;
-        btn.textContent = t('copied');
-        setTimeout(() => btn.textContent = orig, 1500);
-    });
-}
-
-setLang(currentLang);
-fetchStatus();
-setInterval(fetchStatus, 5000);
-    </script>
+function copyResult(){const txt=document.getElementById('result').textContent;navigator.clipboard.writeText(txt).then(()=>{const b=event.target,o=b.textContent;b.textContent=i18n[currentLang].copied;setTimeout(()=>b.textContent=o,1500);});}
+const uz=document.getElementById('uploadZone');
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('dragover');});
+uz.addEventListener('dragleave',()=>uz.classList.remove('dragover'));
+uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('dragover');handleFile(e.dataTransfer.files[0]);});
+setLang(currentLang);fetchStatus();setInterval(fetchStatus,5000);
+</script>
 </body>
 </html>
