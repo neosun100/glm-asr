@@ -2,6 +2,7 @@
 import os
 import json
 import tempfile
+import traceback
 import logging
 from pathlib import Path
 from flask import Flask, request, jsonify, Response, send_from_directory
@@ -268,6 +269,8 @@ def transcribe_stream():
                     result_holder[0] = gpu_manager.transcribe(filepath, max_new_tokens, on_progress)
                 except Exception as e:
                     error_holder[0] = str(e)
+                    # 打印出错误栈以便调试
+                    traceback.print_exception(e)
             
             thread = threading.Thread(target=do_transcribe)
             thread.start()

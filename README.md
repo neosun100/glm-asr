@@ -39,6 +39,21 @@ Web UI • REST API • SSE Streaming • Swagger Docs
 
 ## 🚀 Quick Start
 
+> [!IMPORTANT]
+> - If you are using CUDA, it is best to work on Linux, because torchcodec has poor support on Windows. If you must use Windows, it seems that you can only install it via conda, since `torchcodec-x.x.x-cudaxxx` packages are only available on [conda-forge](https://anaconda.org/channels/conda-forge/packages/torchcodec/overview). They are **not** provided on [pytorch/torchcodec](https://download.pytorch.org/whl/torchcodec/).
+> - Before install pay attention to `torchcodec-torch-python` version compatibility, see [link](https://github.com/meta-pytorch/torchcodec?tab=readme-ov-file#installing-cpu-only-torchcodec).
+> - Pay attention to the `dtype` that is automatically loaded when using `auto`, and make sure it is supported by your GPU; otherwise, performance can be very slow. Reference [link](https://docs.nvidia.com/deeplearning/tensorrt/latest/getting-started/support-matrix.html#hardware-and-precision)
+> see [GPUManager.load()](gpu_manager.py#L47-L50)
+> ```python
+> # torch.cuda.get_device_capability()
+> self.model: GlmAsrForConditionalGeneration = AutoModelForSeq2SeqLM.from_pretrained(
+>     checkpoint_dir,
+>     dtype="auto",
+>     device_map="auto",
+> )
+> ```
+
+
 ### Docker (Recommended)
 
 ```bash

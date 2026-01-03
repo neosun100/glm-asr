@@ -4,6 +4,7 @@ import logging
 import torch
 from pathlib import Path
 from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoProcessor
+from transformers.models import GlmAsrProcessor, GlmAsrConfig, GlmAsrForConditionalGeneration
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,11 +42,11 @@ class GPUManager:
             logger.info(f"正在加载模型: {checkpoint_dir}")
             self.checkpoint_dir = checkpoint_dir
             
-            self.processor = AutoProcessor.from_pretrained(checkpoint_dir)
-            self.config = AutoConfig.from_pretrained(checkpoint_dir, trust_remote_code=True)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(
+            self.processor: GlmAsrProcessor = AutoProcessor.from_pretrained(checkpoint_dir)
+            self.config: GlmAsrConfig = AutoConfig.from_pretrained(checkpoint_dir, trust_remote_code=True)
+            self.model: GlmAsrForConditionalGeneration = AutoModelForSeq2SeqLM.from_pretrained(
                 checkpoint_dir,
-                dtype="auto",
+                dtype="auto", # 需要根据显卡选择是否有硬件加速的dtype, 否则auto默认就是bf16, 若是不支持就很慢
                 device_map="auto",
             )
             self.model.eval()
@@ -101,10 +102,12 @@ class GPUManager:
         with self.lock:
             wav, sr = torchaudio.load(str(audio_path))
             wav = wav[:1, :]
+            # sr, sampling rate 统一为 16k
             if sr != 16000:
                 wav = torchaudio.transforms.Resample(sr, 16000)(wav)
+                sr = 16000
             
-            duration = wav.shape[1] / 16000
+            duration = wav.shape[1] / sr
             logger.info(f"音频时长: {duration:.1f}s")
             
             if duration <= 25:
@@ -120,21 +123,21 @@ class GPUManager:
                     progress_callback(1, 1, duration, text)
                 return text
             
-            segments = smart_segment(wav[0], sr=16000, max_duration=25.0, min_duration=2.0)
+            segments = smart_segment(wav[0], sr=sr, max_duration=25.0, min_duration=2.0)
             if not segments:
                 return ""
             
             total = len(segments)
             results = []
             for i, (start, end) in enumerate(segments):
-                seg_dur = (end - start) / 16000
+                seg_dur = (end - start) / sr
                 if progress_callback:
                     progress_callback(i + 1, total, seg_dur, None)
                 
                 chunk = wav[:, start:end]
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                     tmp_path = f.name
-                    torchaudio.save(tmp_path, chunk, 16000)
+                    torchaudio.save(tmp_path, chunk, sr)
                 
                 try:
                     inputs = self.processor.apply_transcription_request(tmp_path)

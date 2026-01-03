@@ -38,6 +38,20 @@ Web 界面 • REST API • MCP 服务 • 长音频支持
 
 ## 🚀 快速开始
 
+> [!IMPORTANT]  
+> - 若是使用cuda, 最好在linux上使用, 因为torchcodec在win上支持的不好, 非得用win, 似乎只能用conda来安装, 因为`torchcodec-x.x.x-cudaxxx`只在[conda-forge](https://anaconda.org/channels/conda-forge/packages/torchcodec/overview)上提供了包, [pytorch/torchcodec](https://download.pytorch.org/whl/torchcodec/)**未提供**
+> - 安装注意`torchcodec-torch-python`的版本对应关系, 详见[link](https://github.com/meta-pytorch/torchcodec?tab=readme-ov-file#installing-cpu-only-torchcodec)
+> - 注意`auto`时自动加载的`dtype`, 是否为自己显卡支持的, 否则很慢. 参考[link](https://docs.nvidia.com/deeplearning/tensorrt/latest/getting-started/support-matrix.html#hardware-and-precision)
+> 在[GPUManager.load()](gpu_manager.py#L47-L50)
+> ```python
+> # torch.cuda.get_device_capability()
+> self.model: GlmAsrForConditionalGeneration = AutoModelForSeq2SeqLM.from_pretrained(
+>     checkpoint_dir,
+>     dtype="auto",
+>     device_map="auto",
+> )
+> ```
+
 ### Docker 方式（推荐）
 
 ```bash
